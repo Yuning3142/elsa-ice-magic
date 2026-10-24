@@ -44,13 +44,14 @@ function renderHands(result,now){
     // Sigil: hold a clean OK sign; fires once per hold
     st.pinchSince=gesture.pinch?prev?.pinchSince||now:0;st.sigilFired=gesture.pinch&&prev?.sigilFired;
     if(gesture.pinch&&!st.sigilFired&&now-st.pinchSince>hold(600))st.sigilFired=cast(now,'❄ SNOWFLAKE SIGIL ❄',()=>{const p=point({x:(l[4].x+l[8].x)/2,y:(l[4].y+l[8].y)/2});fx.sigil(p.x,p.y)});
-    // Burst: charge a steady fist for 0.7s (charge glow brightens when ready), then snap it open within 0.25s.
-    // A moving fist doesn't charge, since turning or moving hands are often misread as fists.
+    // Burst: charge a fairly steady fist for 0.45s (charge glow brightens when ready), then open it within 0.5s.
+    // A fist moving across the screen doesn't charge, since moving/turning hands are often misread as fists.
+    // The open is checked on the raw gesture (2 frames in a row) so the debounce doesn't eat the time window.
     if(kind==='fist'){
-      if(prev?.kind!=='fist'||distance(center,st.fistAnchor??center)>innerWidth*.06){st.fistAnchor=center;st.fistChargeFrom=now}
-      const ready=now-st.fistChargeFrom>hold(700);fx.charge(center.x,center.y);if(ready){fx.charge(center.x,center.y);fx.charge(center.x,center.y);st.fistReadyAt=now}
+      if(prev?.kind!=='fist'||distance(center,st.fistAnchor??center)>innerWidth*.12){st.fistAnchor=center;st.fistChargeFrom=now}
+      const ready=now-st.fistChargeFrom>hold(450);fx.charge(center.x,center.y);if(ready){fx.charge(center.x,center.y);fx.charge(center.x,center.y);st.fistReadyAt=now}
     }
-    if(kind==='open'&&prev?.kind!=='open'&&now-(st.fistReadyAt??-1e9)<250&&cast(now,'❄ FROST BURST ❄',()=>fx.burst(center.x,center.y)))st.fistReadyAt=-1e9;
+    if(gesture.kind==='open'&&rawCount>=2&&now-(st.fistReadyAt??-1e9)<500&&cast(now,'❄ FROST BURST ❄',()=>fx.burst(center.x,center.y)))st.fistReadyAt=-1e9;
     // Ice armor: hold ✌ to toggle; the hand must leave ✌ before it can toggle again
     st.armorToggled=kind==='peace'&&prev?.armorToggled;
     if(kind==='peace'&&!st.armorToggled&&held>hold(800))st.armorToggled=fx.isArmored(id)?cast(now,'❄ ARMOR SHATTERED ❄',()=>fx.armorOff(id)):cast(now,'❄ ICE GAUNTLET ❄',()=>fx.armorOn(id));
