@@ -8,7 +8,8 @@ let detector,stream,running=false,lastVideoTime=-1,lastDetect=0,handStates=new M
 // Served locally from node_modules (copied by the copy-wasm script) so the WASM always matches the installed JS version
 const WASM=`${import.meta.env.BASE_URL}mediapipe-wasm`;
 const MODEL='https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
-function errText(e){return e instanceof Error?e.message:e?.type==='error'&&e.target?.src?`无法加载 ${e.target.src}`:String(e)}
+const CAMERA_ERRORS={NotAllowedError:'没有摄像头权限，请在浏览器和系统设置中允许',NotReadableError:'摄像头被其他程序占用（如 Teams、Zoom、相机），请关闭后重试',NotFoundError:'没有找到摄像头',OverconstrainedError:'摄像头不支持所需的分辨率'};
+function errText(e){return CAMERA_ERRORS[e?.name]??(e instanceof Error?e.message:e?.type==='error'&&e.target?.src?`无法加载 ${e.target.src}`:String(e))}
 function notice(t){spell.textContent=t;spell.classList.add('show');clearTimeout(spellTimer);spellTimer=setTimeout(()=>spell.classList.remove('show'),900)}
 function distance(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
 function point(p){return {x:(1-p.x)*innerWidth,y:(1-p.y)*innerHeight}} // video is CSS-mirrored; Three coordinates use bottom-left origin
@@ -68,7 +69,7 @@ start.addEventListener('click',async()=>{
   try{
     stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:'user',width:{ideal:1280},height:{ideal:720}}});video.srcObject=stream;await video.play();status.textContent='正在加载手势识别模型（首次需要联网）…';
     const vision=await FilesetResolver.forVisionTasks(WASM);
-    // CPU delegate avoids competing with Three.js for the GPU, which can drop the WebGL context on Mac Chrome
+    // CPU delegate avoids competing with Three.js for the GPU, which can drop the WebGL context
     const opts=delegate=>({baseOptions:{modelAssetPath:MODEL,delegate},runningMode:'VIDEO',numHands:2,minHandDetectionConfidence:.55,minTrackingConfidence:.5});
     try{detector=await HandLandmarker.createFromOptions(vision,opts('CPU'))}
     catch{detector=await HandLandmarker.createFromOptions(vision,opts('GPU'))}
