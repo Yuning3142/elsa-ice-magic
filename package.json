@@ -1,0 +1,22 @@
+{
+  "name": "elsa-ice-magic",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "copy-wasm": "node -e \"require('fs').cpSync('node_modules/@mediapipe/tasks-vision/wasm','public/mediapipe-wasm',{recursive:true})\"",
+    "postinstall": "npm run copy-wasm",
+    "predev": "npm run copy-wasm",
+    "prebuild": "npm run copy-wasm",
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "^0.10.22",
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "vite": "^7.1.0"
+  }
+}
