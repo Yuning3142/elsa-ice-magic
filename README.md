@@ -1,5 +1,7 @@
 # Elsa Ice Magic — Mac 手势冰雪魔法
 
+**在线体验：** https://yuning3142.github.io/elsa-ice-magic/ （用 Chrome 打开，允许摄像头即可）
+
 ## 要求
 - macOS、摄像头、Chrome 或 Safari（推荐最新版 Chrome）
 - Node.js 20.19+ 或 22.12+（推荐 Node.js 22 LTS）
@@ -43,3 +45,6 @@ npm run dev
 - `src/main.js`：MediaPipe 初始化、手势状态机、双手逻辑
 - `src/effects.js`：Three.js 粒子系统、发光雪花纹理
 - `src/style.css`：界面风格
+
+## 许可证
+MIT，见 [LICENSE](LICENSE)。
