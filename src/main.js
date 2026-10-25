@@ -54,7 +54,7 @@ function renderHands(result,now){
     if(gesture.kind==='open'&&rawCount>=2&&now-(st.fistReadyAt??-1e9)<500&&cast(now,'❄ FROST BURST ❄',()=>fx.burst(center.x,center.y)))st.fistReadyAt=-1e9;
     // Ice armor: hold ✌ to toggle; the hand must leave ✌ before it can toggle again
     st.armorToggled=kind==='peace'&&prev?.armorToggled;
-    if(kind==='peace'&&!st.armorToggled&&held>hold(800))st.armorToggled=fx.isArmored(id)?cast(now,'❄ ARMOR SHATTERED ❄',()=>fx.armorOff(id)):cast(now,'❄ ICE GAUNTLET ❄',()=>fx.armorOn(id));
+    if(kind==='peace'&&!st.armorToggled&&held>hold(800))st.armorToggled=fx.isArmored(id)?cast(now,'❄ GLOVE OFF ❄',()=>fx.armorOff(id)):cast(now,'❄ FROST GLOVE ❄',()=>fx.armorOn(id));
     if(fx.isArmored(id))fx.armorTrack(id,l.map(point));
     st.hist=[...(prev?.hist??[]).filter(p=>now-p.t<450),{t:now,y:center.y}];
     hands.push({center,kind,held,hist:st.hist});handStates.set(id,st);

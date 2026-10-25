@@ -22,7 +22,7 @@
 | ✊ 握拳 | 能量汇聚 |
 | ✊ → ✋ 握拳蓄力约 0.5 秒（能量变亮），再快速张开 | 冰晶爆炸 |
 | 👌 OK 手势保持 0.6 秒 | 雪花法阵 |
-| ✌ 剪刀手保持 0.8 秒 | 这只手覆上冰手套，戴着冰手套甩食指会射出三连冰锥；再比一次 ✌ 解除 |
+| ✌ 剪刀手保持 0.8 秒 | 这只手戴上冰蓝缎面长手套（带蕾丝袖口和亮片），戴着手套甩食指会射出三连冰锥；再比一次 ✌ 脱下 |
 | 🙌 双手张开、左右分开 | 从天而降的暴风雪 |
 | ⬆ 双手一起快速上抬 | 冰刺从地面升起 |
 | 👏 双手从两侧快速合拢 | 冰环冲击波 |
@@ -67,7 +67,7 @@ npm run dev
 ## 技术实现
 
 - **手势识别：** Google [MediaPipe](https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker) HandLandmarker 识别每只手的 21 个关键点，再由 `classify()` 根据手指伸展情况和前后帧的运动判断手势
-- **特效：** [Three.js](https://threejs.org/) 负责粒子、冰刺、法阵和冰环；冰手套和冰封画面用 Canvas 2D 绘制
+- **特效：** [Three.js](https://threejs.org/) 负责粒子、冰刺、法阵和冰环；冰雪手套和冰封画面用 Canvas 2D 绘制
 - **部署：** 推送到 `main` 后，GitHub Actions 自动构建并发布到 GitHub Pages
 
 | 文件 | 内容 |

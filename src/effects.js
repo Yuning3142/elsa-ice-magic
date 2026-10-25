@@ -93,19 +93,14 @@ export class MagicEffects{
     const branch=(px,py,a,len,depth)=>{if(depth>4||len<3)return;const nx=px+Math.cos(a)*len,ny=py+Math.sin(a)*len;x.strokeStyle=`rgba(235,252,255,${.55-depth*.07})`;x.lineWidth=Math.max(.5,2-depth*.35);x.beginPath();x.moveTo(px,py);x.lineTo(nx,ny);x.stroke();branch(nx,ny,a+rnd(-.25,.25),len*.78,depth+.4);if(Math.random()<.75)branch(nx,ny,a+rnd(.5,1.1),len*.5,depth+1);if(Math.random()<.75)branch(nx,ny,a-rnd(.5,1.1),len*.5,depth+1)};
     const n=Math.round((w+h)/9);for(let k=0;k<n;k++){const side=k%4,u=Math.random();const [px,py,a]=side===0?[u*w,0,Math.PI/2]:side===1?[u*w,h,-Math.PI/2]:side===2?[0,u*h,0]:[w,u*h,Math.PI];branch(px,py,a+rnd(-.6,.6),rnd(8,22)*(Math.random()<.15?2:1),0)}
   }
-  // Ice gauntlet: one seamless glove silhouette drawn on a 2D canvas under the particles.
+  // Ice-blue satin opera glove: one seamless silhouette drawn on a 2D canvas under the particles.
   // pts = 21 landmarks in Three coords (y up), fed via armorTrack().
   armorOn(id){
     if(this.armors.has(id))return;
-    if(!this.gloveCanvas){
-      this.gloveCanvas=document.createElement('canvas');Object.assign(this.gloveCanvas.style,{position:'absolute',inset:0,width:'100%',height:'100%',pointerEvents:'none'});this.root.insertBefore(this.gloveCanvas,this.renderer.domElement);
-      this.gloveBuf=document.createElement('canvas');
-      const f=document.createElement('canvas');f.width=f.height=220;const x=f.getContext('2d'); // crackle texture for the ice surface
-      for(let k=0;k<26;k++){x.strokeStyle=`rgba(255,255,255,${rnd(.15,.45)})`;x.lineWidth=rnd(.6,1.6);x.beginPath();let px=rnd(0,220),py=rnd(0,220);x.moveTo(px,py);for(let n=0;n<4;n++){px+=rnd(-45,45);py+=rnd(-45,45);x.lineTo(px,py)}x.stroke()}
-      for(let k=0;k<14;k++){x.fillStyle=`rgba(${k%2?'255,255,255':'40,120,190'},${rnd(.05,.14)})`;x.beginPath();const cx=rnd(0,220),cy=rnd(0,220);for(let n=0;n<3;n++)x.lineTo(cx+rnd(-40,40),cy+rnd(-40,40));x.fill()}
-      this.crackle=f;
-    }
-    this.armors.set(id,{age:0,seen:-1,spikes:Array.from({length:9},()=>rnd(.12,.3))});
+    if(!this.gloveCanvas){this.gloveCanvas=document.createElement('canvas');Object.assign(this.gloveCanvas.style,{position:'absolute',inset:0,width:'100%',height:'100%',pointerEvents:'none'});this.root.insertBefore(this.gloveCanvas,this.renderer.domElement);this.gloveBuf=document.createElement('canvas')}
+    // glitter: fixed spots on the glove (bone index, position along it, sideways offset) that twinkle
+    const glitter=Array.from({length:34},()=>({b:Math.floor(Math.random()*ARMOR_BONES.length),t:Math.random(),o:rnd(-.08,.08),ph:rnd(0,Math.PI*2),sp:rnd(2,4)}));
+    this.armors.set(id,{age:0,seen:-1,glitter});
   }
   armorTrack(id,pts){const a=this.armors.get(id);if(a){a.pts=pts;a.seen=performance.now()}}
   armorOff(id){
@@ -122,28 +117,49 @@ export class MagicEffects{
   drawGlove(ctx,a){
     const H=innerHeight,P=a.pts.map(p=>({x:p.x,y:H-p.y})),size=Math.hypot(P[9].x-P[0].x,P[9].y-P[0].y),t=a.age;
     const ux=(P[9].x-P[0].x)/size,uy=(P[9].y-P[0].y)/size,nx=-uy,ny=ux; // hand axis (wrist -> middle knuckle) and its normal
-    const xs=P.map(p=>p.x),ys=P.map(p=>p.y),pad=size*1.2,bx=Math.min(...xs)-pad,by=Math.min(...ys)-pad,bw=Math.max(...xs)-bx+pad,bh=Math.max(...ys)-by+pad;
+    const E={x:P[0].x-ux*size*1.1,y:P[0].y-uy*size*1.1}; // end of the opera-length sleeve on the forearm
+    const xs=[...P.map(p=>p.x),E.x],ys=[...P.map(p=>p.y),E.y],pad=size*.9,bx=Math.min(...xs)-pad,by=Math.min(...ys)-pad,bw=Math.max(...xs)-bx+pad,bh=Math.max(...ys)-by+pad;
     const b=this.gloveBuf;b.width=Math.ceil(bw);b.height=Math.ceil(bh);const m=b.getContext('2d');m.translate(-bx,-by);
-    // 1. Silhouette: round-capped bones (thicker at the base), palm, pointed fingertips, knuckle ridges, flared spiky cuff
-    m.lineCap=m.lineJoin='round';m.fillStyle=m.strokeStyle='#fff';
-    for(const [i,j] of ARMOR_BONES){const d=ARMOR_DEPTH[j];m.lineWidth=size*(d<=1?.34:i<5?.3-.02*d:.3-.025*d);m.beginPath();m.moveTo(P[i].x,P[i].y);m.lineTo(P[j].x,P[j].y);m.stroke()}
+    const line=(pts,w,style)=>{m.lineWidth=w;m.strokeStyle=style;m.beginPath();pts.forEach((p,n)=>n?m.lineTo(p.x,p.y):m.moveTo(p.x,p.y));m.stroke()};
+    const FINGERS=[[1,2,3,4],[5,6,7,8],[9,10,11,12],[13,14,15,16],[17,18,19,20]],WIDTH=[.3,.27,.27,.25,.22]; // base width per finger, tapering toward the tip
+    // 1. Smooth silhouette: rounded fingers, palm, sleeve up the forearm
+    m.lineCap=m.lineJoin='round';m.fillStyle='#fff';
+    FINGERS.forEach((f,k)=>{for(let n=0;n<3;n++)line([P[f[n]],P[f[n+1]]],size*WIDTH[k]*(1-.08*n),'#fff')});
+    line([P[0],P[1]],size*.32,'#fff');line([P[0],P[5]],size*.3,'#fff');line([P[0],P[17]],size*.3,'#fff');line([P[5],P[9],P[13],P[17]],size*.28,'#fff');
     m.beginPath();[0,1,2,5,9,13,17].forEach((k,n)=>n?m.lineTo(P[k].x,P[k].y):m.moveTo(P[k].x,P[k].y));m.closePath();m.fill();
-    for(const j of TIPS){const p=P[j-1],q=P[j],L=Math.hypot(q.x-p.x,q.y-p.y)||1,dx=(q.x-p.x)/L,dy=(q.y-p.y)/L,w=size*.1;m.beginPath();m.moveTo(q.x-dy*w,q.y+dx*w);m.lineTo(q.x+dx*size*.24,q.y+dy*size*.24);m.lineTo(q.x+dy*w,q.y-dx*w);m.fill()}
-    [5,9,13,17].forEach((j,k)=>{const dx=P[j].x-P[0].x,dy=P[j].y-P[0].y,L=Math.hypot(dx,dy),w=size*.08,h=size*(.16+a.spikes[k]*.3);m.beginPath();m.moveTo(P[j].x-dy/L*w,P[j].y+dx/L*w);m.lineTo(P[j].x+dx/L*h-dy/L*size*.05,P[j].y+dy/L*h+dx/L*size*.05);m.lineTo(P[j].x+dy/L*w,P[j].y-dx/L*w);m.fill()});
-    const w0=size*.42,w1=size*.62,cl=size*.6,cx0=P[0].x-ux*size*.05,cy0=P[0].y-uy*size*.05,ex=cx0-ux*cl,ey=cy0-uy*cl;
-    m.beginPath();m.moveTo(cx0+nx*w0,cy0+ny*w0);m.lineTo(ex+nx*w1,ey+ny*w1);
-    for(let k=0;k<a.spikes.length;k++){const f=1-2*(k+.5)/a.spikes.length,sp=size*a.spikes[k];m.lineTo(ex+nx*w1*f-ux*sp,ey+ny*w1*f-uy*sp);const g=1-2*(k+1)/a.spikes.length;m.lineTo(ex+nx*w1*g,ey+ny*w1*g)}
-    m.lineTo(cx0-nx*w0,cy0-ny*w0);m.closePath();m.fill();
-    // 2. Ice surface: gradient along the hand, crackle texture, specular streaks down each finger
-    m.globalCompositeOperation='source-in';const grad=m.createLinearGradient(ex,ey,P[12].x,P[12].y);grad.addColorStop(0,'rgba(170,230,255,.92)');grad.addColorStop(.45,'rgba(110,195,250,.78)');grad.addColorStop(1,'rgba(215,248,255,.9)');m.fillStyle=grad;m.fillRect(bx,by,bw,bh);
-    m.globalCompositeOperation='source-atop';m.fillStyle=m.createPattern(this.crackle,'repeat');m.fillRect(bx,by,bw,bh);
-    m.strokeStyle='rgba(255,255,255,.55)';m.lineWidth=Math.max(1.5,size*.035);for(const f of [[1,2,3,4],[5,6,7,8],[9,10,11,12],[13,14,15,16],[17,18,19,20]]){m.beginPath();f.forEach((k,n)=>{const x=P[k].x-nx*size*.05,y=P[k].y-ny*size*.05;n?m.lineTo(x,y):m.moveTo(x,y)});m.stroke()}
-    const sweep=(t*.6%1.6)-.3,sg=m.createLinearGradient(ex,ey,P[12].x,P[12].y);const cl01=v=>Math.min(1,Math.max(0,v));sg.addColorStop(cl01(sweep-.12),'rgba(255,255,255,0)');sg.addColorStop(cl01(sweep),'rgba(255,255,255,.4)');sg.addColorStop(cl01(sweep+.12),'rgba(255,255,255,0)');m.fillStyle=sg;m.fillRect(bx,by,bw,bh); // light sweeping up the glove
-    // 3. Freeze reveal: grows outward from the wrist over ~0.6s
-    const reveal=size*5*Math.min(t/.6,1);if(reveal<size*5){m.globalCompositeOperation='destination-in';const rg=m.createRadialGradient(ex,ey,0,ex,ey,reveal+1);rg.addColorStop(0,'#fff');rg.addColorStop(.85,'#fff');rg.addColorStop(1,'rgba(255,255,255,0)');m.fillStyle=rg;m.fillRect(bx,by,bw,bh)}
-    // 4. Composite with a cold outer glow
-    ctx.save();ctx.shadowColor='rgba(120,215,255,.9)';ctx.shadowBlur=size*.35*(.85+.15*Math.sin(t*4));ctx.drawImage(b,bx,by);ctx.restore();
-    if(Math.random()<.4){const j=TIPS[Math.floor(Math.random()*5)];this.spawn(P[j].x+rnd(-6,6),H-P[j].y+rnd(-6,6),{vx:rnd(-20,20),vy:rnd(-60,-10),size:rnd(8,18),life:rnd(.3,.7),gravity:-40,star:Math.random()<.3})}
+    const w0=size*.36,w1=size*.46;
+    // heel of the hand: hull of the knuckles and both sleeve corners, sorted by angle so it never self-intersects
+    const hc={x:(P[0].x+P[9].x)/2,y:(P[0].y+P[9].y)/2},heel=[P[1],P[5],P[9],P[13],P[17],{x:P[0].x+nx*w0,y:P[0].y+ny*w0},{x:P[0].x-nx*w0,y:P[0].y-ny*w0}].sort((p,q)=>Math.atan2(p.y-hc.y,p.x-hc.x)-Math.atan2(q.y-hc.y,q.x-hc.x));
+    m.beginPath();heel.forEach((p,n)=>n?m.lineTo(p.x,p.y):m.moveTo(p.x,p.y));m.closePath();m.fill();line([...heel,heel[0]],size*.12,'#fff');
+    m.beginPath();m.moveTo(P[0].x+nx*w0,P[0].y+ny*w0);m.lineTo(E.x+nx*w1,E.y+ny*w1);m.lineTo(E.x-nx*w1,E.y-ny*w1);m.lineTo(P[0].x-nx*w0,P[0].y-ny*w0);m.closePath();m.fill();
+    // 2. Satin shading: darker at the sides, light down the middle, plus a soft glow on the back of the hand
+    m.globalCompositeOperation='source-in';
+    const c=P[9],g=m.createLinearGradient(c.x-nx*size*1.1,c.y-ny*size*1.1,c.x+nx*size*1.1,c.y+ny*size*1.1);
+    g.addColorStop(0,'#3f8fd0');g.addColorStop(.3,'#79bfee');g.addColorStop(.5,'#a8dcfb');g.addColorStop(.7,'#79bfee');g.addColorStop(1,'#3f8fd0');m.fillStyle=g;m.fillRect(bx,by,bw,bh);
+    m.globalCompositeOperation='source-atop';
+    const pc={x:(P[0].x+P[9].x)/2,y:(P[0].y+P[9].y)/2},rg=m.createRadialGradient(pc.x,pc.y,0,pc.x,pc.y,size*.9);rg.addColorStop(0,'rgba(255,255,255,.28)');rg.addColorStop(1,'rgba(255,255,255,0)');m.fillStyle=rg;m.fillRect(bx,by,bw,bh);
+    // each finger gets a darker rim and a satin highlight so it reads as round
+    FINGERS.forEach((f,k)=>{const pts=f.map(i=>P[i]);line(pts,size*WIDTH[k]*.95,'rgba(20,70,130,.22)');line(pts,size*WIDTH[k]*.62,'rgba(150,215,250,.55)');line(pts.map(p=>({x:p.x-nx*size*.035,y:p.y-ny*size*.035})),size*.05,'rgba(255,255,255,.55)')});
+    // sleeve: soft vertical sheen and a few satin folds
+    line([{x:P[0].x-nx*size*.08,y:P[0].y-ny*size*.08},{x:E.x-nx*size*.1,y:E.y-ny*size*.1}],size*.12,'rgba(255,255,255,.28)');
+    for(const f of [.35,.62,.85]){const q={x:P[0].x+(E.x-P[0].x)*f,y:P[0].y+(E.y-P[0].y)*f},w=w0+(w1-w0)*f;m.lineWidth=size*.02;m.strokeStyle='rgba(30,90,150,.25)';m.beginPath();m.moveTo(q.x+nx*w*.9,q.y+ny*w*.9);m.quadraticCurveTo(q.x-ux*size*.06,q.y-uy*size*.06,q.x-nx*w*.9,q.y-ny*w*.9);m.stroke()}
+    // classic glove stitching on the back of the hand
+    m.setLineDash([size*.04,size*.035]);for(const k of [5,9,13]){const s0={x:P[0].x+(P[k].x-P[0].x)*.18,y:P[0].y+(P[k].y-P[0].y)*.18},s1={x:P[0].x+(P[k].x-P[0].x)*.72,y:P[0].y+(P[k].y-P[0].y)*.72};line([s0,s1],Math.max(1,size*.014),'rgba(225,245,255,.7)')}m.setLineDash([]);
+    // satin light sweeping along the glove
+    const cl01=v=>Math.min(1,Math.max(0,v)),sweep=(t*.45%1.6)-.3,sg=m.createLinearGradient(E.x,E.y,P[12].x,P[12].y);sg.addColorStop(cl01(sweep-.15),'rgba(255,255,255,0)');sg.addColorStop(cl01(sweep),'rgba(255,255,255,.3)');sg.addColorStop(cl01(sweep+.15),'rgba(255,255,255,0)');m.fillStyle=sg;m.fillRect(bx,by,bw,bh);
+    // 3. Lace cuff: a light band with a scalloped edge at the top of the sleeve
+    m.globalCompositeOperation='source-over';
+    const cuffA={x:E.x+ux*size*.06,y:E.y+uy*size*.06};line([{x:cuffA.x+nx*w1,y:cuffA.y+ny*w1},{x:cuffA.x-nx*w1,y:cuffA.y-ny*w1}],size*.14,'rgba(225,245,255,.95)');
+    const nS=9,r=w1/nS*1.15;for(let k=0;k<nS;k++){const f=-1+(2*k+1)/nS,q={x:E.x+nx*w1*f-ux*size*.02,y:E.y+ny*w1*f-uy*size*.02};m.fillStyle='rgba(240,250,255,.9)';m.beginPath();m.arc(q.x,q.y,r,0,Math.PI*2);m.fill();m.fillStyle='rgba(120,190,240,.55)';m.beginPath();m.arc(q.x-ux*r*.25,q.y-uy*r*.25,r*.32,0,Math.PI*2);m.fill()}
+    line([{x:cuffA.x+nx*w1,y:cuffA.y+ny*w1},{x:cuffA.x-nx*w1,y:cuffA.y-ny*w1}],Math.max(1,size*.018),'rgba(110,180,235,.8)');
+    // 4. Put-on reveal: the glove slides on from the sleeve to the fingertips over ~0.6s
+    const reach=size*4.5*Math.min(t/.6,1);if(reach<size*4.5){m.globalCompositeOperation='destination-in';const rv=m.createRadialGradient(E.x,E.y,0,E.x,E.y,reach+1);rv.addColorStop(0,'#fff');rv.addColorStop(.88,'#fff');rv.addColorStop(1,'rgba(255,255,255,0)');m.fillStyle=rv;m.fillRect(bx,by,bw,bh)}
+    // 5. Composite with a soft shadow for depth and a faint frosty glow, then twinkling glitter on top
+    ctx.save();ctx.shadowColor='rgba(120,200,255,.55)';ctx.shadowBlur=size*.18;ctx.drawImage(b,bx,by);ctx.restore();
+    const shown=Math.min(t/.6,1);ctx.save();ctx.fillStyle='#fff';ctx.shadowColor='#bff0ff';ctx.shadowBlur=6;
+    for(const gl of a.glitter){const [i,j]=ARMOR_BONES[gl.b],p=P[i],q=P[j];if(Math.hypot((p.x+q.x)/2-E.x,(p.y+q.y)/2-E.y)>size*4.5*shown)continue;const x=p.x+(q.x-p.x)*gl.t+nx*size*gl.o,y=p.y+(q.y-p.y)*gl.t+ny*size*gl.o,tw=Math.max(0,Math.sin(t*gl.sp+gl.ph))**6,r=size*.045*tw;if(r<.6)continue;ctx.globalAlpha=tw;ctx.beginPath();ctx.moveTo(x,y-r*2);ctx.lineTo(x+r*.4,y-r*.4);ctx.lineTo(x+r*2,y);ctx.lineTo(x+r*.4,y+r*.4);ctx.lineTo(x,y+r*2);ctx.lineTo(x-r*.4,y+r*.4);ctx.lineTo(x-r*2,y);ctx.lineTo(x-r*.4,y-r*.4);ctx.fill()}
+    ctx.restore();
+    if(Math.random()<.25){const j=TIPS[Math.floor(Math.random()*5)];this.spawn(P[j].x+rnd(-6,6),H-P[j].y+rnd(-6,6),{vx:rnd(-20,20),vy:rnd(-50,-10),size:rnd(8,16),life:rnd(.3,.6),gravity:-40,star:true})}
   }
   updateSpires(dt){
     for(let i=this.spires.length-1;i>=0;i--){
