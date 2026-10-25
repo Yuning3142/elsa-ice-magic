@@ -132,21 +132,37 @@ export class MagicEffects{
     const hc={x:(P[0].x+P[9].x)/2,y:(P[0].y+P[9].y)/2},heel=[P[1],P[5],P[9],P[13],P[17],{x:P[0].x+nx*w0,y:P[0].y+ny*w0},{x:P[0].x-nx*w0,y:P[0].y-ny*w0}].sort((p,q)=>Math.atan2(p.y-hc.y,p.x-hc.x)-Math.atan2(q.y-hc.y,q.x-hc.x));
     m.beginPath();heel.forEach((p,n)=>n?m.lineTo(p.x,p.y):m.moveTo(p.x,p.y));m.closePath();m.fill();line([...heel,heel[0]],size*.12,'#fff');
     m.beginPath();m.moveTo(P[0].x+nx*w0,P[0].y+ny*w0);m.lineTo(E.x+nx*w1,E.y+ny*w1);m.lineTo(E.x-nx*w1,E.y-ny*w1);m.lineTo(P[0].x-nx*w0,P[0].y-ny*w0);m.closePath();m.fill();
-    // 2. Satin shading: darker at the sides, light down the middle, plus a soft glow on the back of the hand
+    // 2. One-piece shading. Soft base gradient, then an inner shadow and a rim light computed from the whole
+    //    silhouette at once, so fingers, palm and sleeve read as a single seamless glove.
+    const inv=this.gloveInv??=document.createElement('canvas');inv.width=b.width;inv.height=b.height;const iv=inv.getContext('2d');iv.fillStyle='#000';iv.fillRect(0,0,inv.width,inv.height);iv.globalCompositeOperation='destination-out';iv.drawImage(b,0,0);
     m.globalCompositeOperation='source-in';
-    const c=P[9],g=m.createLinearGradient(c.x-nx*size*1.1,c.y-ny*size*1.1,c.x+nx*size*1.1,c.y+ny*size*1.1);
-    g.addColorStop(0,'#3f8fd0');g.addColorStop(.3,'#79bfee');g.addColorStop(.5,'#a8dcfb');g.addColorStop(.7,'#79bfee');g.addColorStop(1,'#3f8fd0');m.fillStyle=g;m.fillRect(bx,by,bw,bh);
+    const g=m.createLinearGradient(E.x,E.y,P[12].x,P[12].y);g.addColorStop(0,'#7cc3ee');g.addColorStop(.45,'#a3d8f8');g.addColorStop(1,'#bfe6fc');m.fillStyle=g;m.fillRect(bx,by,bw,bh);
     m.globalCompositeOperation='source-atop';
-    const pc={x:(P[0].x+P[9].x)/2,y:(P[0].y+P[9].y)/2},rg=m.createRadialGradient(pc.x,pc.y,0,pc.x,pc.y,size*.9);rg.addColorStop(0,'rgba(255,255,255,.28)');rg.addColorStop(1,'rgba(255,255,255,0)');m.fillStyle=rg;m.fillRect(bx,by,bw,bh);
-    // each finger gets a darker rim and a satin highlight so it reads as round
-    FINGERS.forEach((f,k)=>{const pts=f.map(i=>P[i]);line(pts,size*WIDTH[k]*.95,'rgba(20,70,130,.22)');line(pts,size*WIDTH[k]*.62,'rgba(150,215,250,.55)');line(pts.map(p=>({x:p.x-nx*size*.035,y:p.y-ny*size*.035})),size*.05,'rgba(255,255,255,.55)')});
-    // sleeve: soft vertical sheen and a few satin folds
-    line([{x:P[0].x-nx*size*.08,y:P[0].y-ny*size*.08},{x:E.x-nx*size*.1,y:E.y-ny*size*.1}],size*.12,'rgba(255,255,255,.28)');
-    for(const f of [.35,.62,.85]){const q={x:P[0].x+(E.x-P[0].x)*f,y:P[0].y+(E.y-P[0].y)*f},w=w0+(w1-w0)*f;m.lineWidth=size*.02;m.strokeStyle='rgba(30,90,150,.25)';m.beginPath();m.moveTo(q.x+nx*w*.9,q.y+ny*w*.9);m.quadraticCurveTo(q.x-ux*size*.06,q.y-uy*size*.06,q.x-nx*w*.9,q.y-ny*w*.9);m.stroke()}
-    // classic glove stitching on the back of the hand
-    m.setLineDash([size*.04,size*.035]);for(const k of [5,9,13]){const s0={x:P[0].x+(P[k].x-P[0].x)*.18,y:P[0].y+(P[k].y-P[0].y)*.18},s1={x:P[0].x+(P[k].x-P[0].x)*.72,y:P[0].y+(P[k].y-P[0].y)*.72};line([s0,s1],Math.max(1,size*.014),'rgba(225,245,255,.7)')}m.setLineDash([]);
-    // satin light sweeping along the glove
-    const cl01=v=>Math.min(1,Math.max(0,v)),sweep=(t*.45%1.6)-.3,sg=m.createLinearGradient(E.x,E.y,P[12].x,P[12].y);sg.addColorStop(cl01(sweep-.15),'rgba(255,255,255,0)');sg.addColorStop(cl01(sweep),'rgba(255,255,255,.3)');sg.addColorStop(cl01(sweep+.15),'rgba(255,255,255,0)');m.fillStyle=sg;m.fillRect(bx,by,bw,bh);
+    const edge=(color,blur,dx,dy)=>{m.save();m.shadowColor=color;m.shadowBlur=blur;m.shadowOffsetX=dx;m.shadowOffsetY=dy;m.drawImage(inv,bx,by);m.restore()};
+    edge('rgba(28,90,165,.75)',size*.16,0,0);           // rounded, darker edges everywhere
+    edge('rgba(255,255,255,.75)',size*.05,-nx*size*.04,-ny*size*.04); // rim light along one side
+    const L=(al,sd)=>({x:P[0].x+ux*size*al+nx*size*sd,y:P[0].y+uy*size*al+ny*size*sd}); // hand-local coords: along / sideways
+    const glowC=L(.5,0),rg=m.createRadialGradient(glowC.x,glowC.y,0,glowC.x,glowC.y,size*.8);rg.addColorStop(0,'rgba(255,255,255,.3)');rg.addColorStop(1,'rgba(255,255,255,0)');m.fillStyle=rg;m.fillRect(bx,by,bw,bh);
+    const cl01=v=>Math.min(1,Math.max(0,v)),sweep=(t*.45%1.6)-.3,sg=m.createLinearGradient(E.x,E.y,P[12].x,P[12].y);sg.addColorStop(cl01(sweep-.15),'rgba(255,255,255,0)');sg.addColorStop(cl01(sweep),'rgba(255,255,255,.25)');sg.addColorStop(cl01(sweep+.15),'rgba(255,255,255,0)');m.fillStyle=sg;m.fillRect(bx,by,bw,bh);
+    // 3. Frost embroidery: snowflake on the back of the hand, scrollwork vines to the knuckles and down the sleeve
+    m.save();m.strokeStyle=m.fillStyle='rgba(255,255,255,.85)';m.lineCap=m.lineJoin='round';m.shadowColor='rgba(210,245,255,.9)';m.shadowBlur=size*.03;
+    const lw=Math.max(1.2,size*.021);m.lineWidth=lw;
+    const curve=(...q)=>{m.beginPath();m.moveTo(q[0].x,q[0].y);for(let k=1;k<q.length;k+=2)m.quadraticCurveTo(q[k].x,q[k].y,q[k+1].x,q[k+1].y);m.stroke()};
+    const curl=(al,sd,r,dir)=>{m.beginPath();for(let k=0;k<=16;k++){const a=dir*k*.42,rr=r*(1-k/20);const p=L(al+Math.sin(a)*rr,sd+dir*(1-Math.cos(a))*rr);k?m.lineTo(p.x,p.y):m.moveTo(p.x,p.y)}m.stroke()};
+    const dot=(p,r)=>{m.beginPath();m.arc(p.x,p.y,r,0,Math.PI*2);m.fill()};
+    const sf={al:.42,sd:0},R=.26;                          // central snowflake
+    for(let k=0;k<6;k++){const a=k*Math.PI/3,ax=Math.cos(a),ay=Math.sin(a),pt=f=>L(sf.al+ax*R*f,sf.sd+ay*R*f);curve(pt(0),pt(.5),pt(1));for(const f of [.45,.72]){const base=pt(f),bl=R*.28;for(const sgn of [1,-1]){const ba=a+sgn*.75;m.beginPath();m.moveTo(base.x,base.y);const e=L(sf.al+ax*R*f+Math.cos(ba)*bl,sf.sd+ay*R*f+Math.sin(ba)*bl);m.lineTo(e.x,e.y);m.stroke()}}dot(pt(1.12),lw*1.3)}
+    dot(L(sf.al,0),lw*2.2);
+    for(const side of [1,-1]){                             // vines from the snowflake toward the outer knuckles
+      curve(L(.6,side*.08),L(.78,side*.12),L(.82,side*.3));curl(.82,side*.3,.07,-side);
+      curve(L(.3,side*.14),L(.28,side*.3),L(.42,side*.36));curl(.42,side*.36,.06,side);
+      for(const al of [.66,.74])dot(L(al,side*.2),lw*1.1);
+    }
+    for(const k of [5,9,13,17]){const p=P[k],q=P[k+1];dot({x:p.x+(q.x-p.x)*.55,y:p.y+(q.y-p.y)*.55},lw*1.6)} // jewel on each first finger joint
+    for(const k of [6,10,14,18]){const p=P[k],q=P[k+1];dot({x:p.x+(q.x-p.x)*.5,y:p.y+(q.y-p.y)*.5},lw*1)}
+    let side=1;for(let al=-.08;al>-.95;al-=.22){curve(L(al,0),L(al-.06,side*.06),L(al-.12,0),L(al-.17,-side*.06),L(al-.22,0));curl(al-.06,side*.07,.05,side);side=-side} // sleeve scrollwork
+    m.restore();
+
     // 3. Lace cuff: a light band with a scalloped edge at the top of the sleeve
     m.globalCompositeOperation='source-over';
     const cuffA={x:E.x+ux*size*.06,y:E.y+uy*size*.06};line([{x:cuffA.x+nx*w1,y:cuffA.y+ny*w1},{x:cuffA.x-nx*w1,y:cuffA.y-ny*w1}],size*.14,'rgba(225,245,255,.95)');
