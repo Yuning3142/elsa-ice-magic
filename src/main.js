@@ -23,6 +23,8 @@ let S=1;try{S=Number(localStorage.getItem('sensitivity'))||1}catch{}
 const hold=ms=>ms/S,move=frac=>frac/S;
 // Big spells share a short lockout so one motion can't fire several of them at once
 let lockUntil=0;
+// Spell banner: ✦ instead of ❄ when the spell is upgraded by the frost glove
+const N=(p,t)=>p>1?`✦ ${t} ✦`:`❄ ${t} ❄`;
 function cast(now,name,fn){if(now<lockUntil)return false;fn();lockUntil=now+hold(700);notice(name);return true}
 const STABLE_FRAMES=3; // a gesture must be seen this many detection frames in a row (~0.1s) before it counts
 function renderHands(result,now){
@@ -33,25 +35,26 @@ function renderHands(result,now){
     // Debounce: switch the stable gesture only after the raw gesture repeats STABLE_FRAMES times
     const rawCount=gesture.kind===prev?.raw?prev.rawCount+1:1,kind=rawCount>=STABLE_FRAMES||!prev?gesture.kind:prev.kind;
     const kindSince=kind===prev?.kind?prev.kindSince:now,held=now-kindSince;
+    const pw=fx.isArmored(id)?2:1; // the frost glove upgrades this hand's spells
     const st={...prev,raw:gesture.kind,rawCount,kind,kindSince,lastSeen:now,y:center.y,tip};
-    if(kind==='open')fx.snow(center.x,center.y,5);
-    if(kind==='point')fx.trail(tip.x,tip.y);
+    if(kind==='open')fx.snow(center.x,center.y,5,pw);
+    if(kind==='point')fx.trail(tip.x,tip.y,pw);
 
     st.tipHist=[...(prev?.tipHist??[]).filter(p=>now-p.t<150),{t:now,x:tip.x,y:tip.y}];
     // Flick: a steady point, then the fingertip moves fast AND far within 150ms
     if(kind==='point'&&held>150){const o=st.tipHist[0],dx=tip.x-o.x,dy=tip.y-o.y,dist=Math.hypot(dx,dy),dt=now-o.t;
-      if(dt>40&&dist>innerWidth*move(.12)&&dist/dt>2.2/S&&now-(prev?.shardAt??0)>hold(500))cast(now,'❄ ICE SHARD ❄',()=>{const a=Math.atan2(dy,dx);(fx.isArmored(id)?[-.18,0,.18]:[0]).forEach(o=>fx.shard(tip.x,tip.y,Math.cos(a+o)*1100,Math.sin(a+o)*1100));st.shardAt=now;st.tipHist=[]})}
+      if(dt>40&&dist>innerWidth*move(.12)&&dist/dt>2.2/S&&now-(prev?.shardAt??0)>hold(500))cast(now,N(pw,'ICE SHARD'),()=>{const a=Math.atan2(dy,dx);(pw>1?[-.18,0,.18]:[0]).forEach(o=>fx.shard(tip.x,tip.y,Math.cos(a+o)*1100,Math.sin(a+o)*1100,pw));st.shardAt=now;st.tipHist=[]})}
     // Sigil: hold a clean OK sign; fires once per hold
     st.pinchSince=gesture.pinch?prev?.pinchSince||now:0;st.sigilFired=gesture.pinch&&prev?.sigilFired;
-    if(gesture.pinch&&!st.sigilFired&&now-st.pinchSince>hold(600))st.sigilFired=cast(now,'❄ SNOWFLAKE SIGIL ❄',()=>{const p=point({x:(l[4].x+l[8].x)/2,y:(l[4].y+l[8].y)/2});fx.sigil(p.x,p.y)});
+    if(gesture.pinch&&!st.sigilFired&&now-st.pinchSince>hold(600))st.sigilFired=cast(now,N(pw,'SNOWFLAKE SIGIL'),()=>{const p=point({x:(l[4].x+l[8].x)/2,y:(l[4].y+l[8].y)/2});fx.sigil(p.x,p.y,pw)});
     // Burst: charge a fairly steady fist for 0.45s (charge glow brightens when ready), then open it within 0.5s.
     // A fist moving across the screen doesn't charge, since moving/turning hands are often misread as fists.
     // The open is checked on the raw gesture (2 frames in a row) so the debounce doesn't eat the time window.
     if(kind==='fist'){
       if(prev?.kind!=='fist'||distance(center,st.fistAnchor??center)>innerWidth*.12){st.fistAnchor=center;st.fistChargeFrom=now}
-      const ready=now-st.fistChargeFrom>hold(450);fx.charge(center.x,center.y);if(ready){fx.charge(center.x,center.y);fx.charge(center.x,center.y);st.fistReadyAt=now}
+      const ready=now-st.fistChargeFrom>hold(450);fx.charge(center.x,center.y,pw);if(ready){fx.charge(center.x,center.y,pw);fx.charge(center.x,center.y,pw);st.fistReadyAt=now}
     }
-    if(gesture.kind==='open'&&rawCount>=2&&now-(st.fistReadyAt??-1e9)<500&&cast(now,'❄ FROST BURST ❄',()=>fx.burst(center.x,center.y)))st.fistReadyAt=-1e9;
+    if(gesture.kind==='open'&&rawCount>=2&&now-(st.fistReadyAt??-1e9)<500&&cast(now,N(pw,'FROST BURST'),()=>fx.burst(center.x,center.y,pw)))st.fistReadyAt=-1e9;
     // Ice armor: hold ✌ to toggle; the hand must leave ✌ before it can toggle again
     st.armorToggled=kind==='peace'&&prev?.armorToggled;
     if(kind==='peace'&&!st.armorToggled&&held>hold(800))st.armorToggled=fx.isArmored(id)?cast(now,'❄ GLOVE OFF ❄',()=>fx.armorOff(id)):cast(now,'❄ FROST GLOVE ❄',()=>fx.armorOn(id));
@@ -60,23 +63,24 @@ function renderHands(result,now){
     hands.push({center,kind,held,hist:st.hist});handStates.set(id,st);
   }
   for(const [id,s] of handStates)if(!seen.has(id)&&now-s.lastSeen>500)handStates.delete(id);
+  const P2=[...handStates.keys()].some(id=>fx.isArmored(id))?2:1; // two-hand spells upgrade if either hand wears the glove
   const two=hands.length===2,both=k=>two&&hands.every(h=>h.kind===k);
   // Blizzard: both hands open and well apart for a moment; keeps snowing while held
   if(both('open')){
     const d=distance(hands[0].center,hands[1].center);
-    if(d>innerWidth*Math.min(move(.35),.8)&&hands.every(h=>h.held>hold(300))&&now-stormAt>110){fx.storm(now-stormAt>600);if(now-stormAt>1500)notice('❄ BLIZZARD ❄');stormAt=now}
+    if(d>innerWidth*Math.min(move(.35),.8)&&hands.every(h=>h.held>hold(300))&&now-stormAt>110){fx.storm(now-stormAt>600,P2);if(now-stormAt>1500)notice(N(P2,'BLIZZARD'));stormAt=now}
   }
   // Ice spires: both open hands rose a lot within 450ms, by similar amounts (a deliberate lift, not drift). Three's y axis points up.
   if(both('open')&&now-pillarAt>hold(1500)){
     const rises=hands.map(h=>h.center.y-Math.min(...h.hist.map(p=>p.y))),need=innerHeight*move(.18);
-    if(rises.every(r=>r>need)&&Math.max(...rises)<Math.min(...rises)*2&&cast(now,'❄ ICE PILLARS ❄',()=>hands.forEach(h=>fx.pillar(h.center.x,h.center.y))))pillarAt=now;
+    if(rises.every(r=>r>need)&&Math.max(...rises)<Math.min(...rises)*2&&cast(now,N(P2,'ICE PILLARS'),()=>hands.forEach(h=>fx.pillar(h.center.x,h.center.y,P2))))pillarAt=now;
   }
   // Clap: hands that were far apart closed in fast. When they touch, the tracker often merges them
   // into one hand, so a pair that was approaching and then vanished within 200ms also counts.
   pairHist=pairHist.filter(p=>now-p.t<500);
   if(two){const c0=hands[0].center,c1=hands[1].center;pairHist.push({t:now,d:distance(c0,c1),x:(c0.x+c1.x)/2,y:(c0.y+c1.y)/2})}
   const last=pairHist.at(-1),widest=Math.max(0,...pairHist.map(p=>p.d));
-  if(last&&now-clapAt>hold(1000)&&widest-last.d>innerWidth*move(.25)&&(two?last.d<innerWidth*.18:now-last.t<200&&last.d<innerWidth*.28)&&cast(now,'❄ FROST SHOCKWAVE ❄',()=>fx.ring(last.x,last.y))){clapAt=now;pairHist=[]}
+  if(last&&now-clapAt>hold(1000)&&widest-last.d>innerWidth*move(.25)&&(two?last.d<innerWidth*.18:now-last.t<200&&last.d<innerWidth*.28)&&cast(now,N(P2,'FROST SHOCKWAVE'),()=>fx.ring(last.x,last.y,P2))){clapAt=now;pairHist=[]}
   // Freeze: both fists held frosts the screen; opening any hand thaws it
   if(both('fist')){bothFistSince||=now;if(!frozen&&now-bothFistSince>hold(1200)){frozen=true;notice('❄ ETERNAL WINTER ❄')}}
   else{bothFistSince=0;if(frozen&&hands.some(h=>h.kind==='open')){frozen=false;notice('☀ THAW ☀')}}
@@ -107,4 +111,4 @@ window.addEventListener('keydown',e=>{if(e.key.toLowerCase()==='h')document.body
 // Short synthesized chime, no copyrighted audio or audio file required.
 let audio,enabled=false;const sound=$('#sound');sound.disabled=false;
 sound.addEventListener('click',()=>{enabled=!enabled;sound.textContent=`音效：${enabled?'开':'关'}`;if(enabled)audio??=new (window.AudioContext||window.webkitAudioContext)()});
-const originalBurst=fx.burst.bind(fx);fx.burst=(x,y)=>{originalBurst(x,y);if(!enabled)return;audio.resume();[523,784,1046].forEach((freq,i)=>{const osc=audio.createOscillator(),gain=audio.createGain(),t=audio.currentTime+i*.07;osc.type='sine';osc.frequency.setValueAtTime(freq,t);gain.gain.setValueAtTime(.0001,t);gain.gain.exponentialRampToValueAtTime(.075,t+.02);gain.gain.exponentialRampToValueAtTime(.0001,t+.5);osc.connect(gain).connect(audio.destination);osc.start(t);osc.stop(t+.51)})};
+const originalBurst=fx.burst.bind(fx);fx.burst=(x,y,p)=>{originalBurst(x,y,p);if(!enabled)return;audio.resume();[523,784,1046].forEach((freq,i)=>{const osc=audio.createOscillator(),gain=audio.createGain(),t=audio.currentTime+i*.07;osc.type='sine';osc.frequency.setValueAtTime(freq,t);gain.gain.setValueAtTime(.0001,t);gain.gain.exponentialRampToValueAtTime(.075,t+.02);gain.gain.exponentialRampToValueAtTime(.0001,t+.5);osc.connect(gain).connect(audio.destination);osc.start(t);osc.stop(t+.51)})};

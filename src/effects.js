@@ -32,23 +32,26 @@ export class MagicEffects{
     const s=new THREE.Sprite(mat);s.position.set(x,y,rnd(-5,5));const size=opts.size??rnd(12,30);s.scale.set(size,size,1);this.scene.add(s);
     this.particles.push({s,vx:opts.vx??rnd(-80,80),vy:opts.vy??rnd(-100,40),life:opts.life??rnd(.5,1.25),max:opts.life??1.25,gravity:opts.gravity??20,spin:rnd(-2,2),size});
   }
-  snow(x,y,amount=6){for(let i=0;i<Math.round(amount*this.intensity);i++)this.spawn(x+rnd(-35,35),y+rnd(-35,35),{vx:rnd(-95,95),vy:rnd(-110,30),size:rnd(10,33),life:rnd(.7,1.7),gravity:20})}
-  trail(x,y){for(let i=0;i<Math.round(6*this.intensity);i++)this.spawn(x+rnd(-9,9),y+rnd(-9,9),{vx:rnd(-35,35),vy:rnd(-45,45),size:rnd(8,24),life:rnd(.2,.7),gravity:0})}
-  charge(x,y){for(let i=0;i<Math.round(8*this.intensity);i++){const a=rnd(0,Math.PI*2),r=rnd(30,95);this.spawn(x+Math.cos(a)*r,y+Math.sin(a)*r,{vx:-Math.cos(a)*r*1.6,vy:-Math.sin(a)*r*1.6,size:rnd(12,29),life:rnd(.25,.7),gravity:0,color:0x72caff})}}
-  burst(x,y){for(let i=0;i<Math.round(135*this.intensity);i++){const a=rnd(0,Math.PI*2),v=rnd(80,600);this.spawn(x,y,{vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:rnd(.65,1.65),size:rnd(10,44),gravity:25,star:i%3===0})}}
+  // p = power: 1 normal, 2 when cast with the frost glove on (bigger, brighter, more star crystals)
+  snow(x,y,amount=6,p=1){if(p>1){for(let i=0;i<Math.round(amount*2*this.intensity);i++){const a=rnd(0,Math.PI*2),r=rnd(40,95);this.spawn(x+Math.cos(a)*r,y+Math.sin(a)*r,{vx:-Math.sin(a)*170+rnd(-20,20),vy:Math.cos(a)*170+rnd(-20,20),size:rnd(14,40),life:rnd(.8,1.6),gravity:0,star:Math.random()<.55,color:0xffffff})}return}
+    for(let i=0;i<Math.round(amount*this.intensity);i++)this.spawn(x+rnd(-35,35),y+rnd(-35,35),{vx:rnd(-95,95),vy:rnd(-110,30),size:rnd(10,33),life:rnd(.7,1.7),gravity:20})}
+  trail(x,y,p=1){for(let i=0;i<Math.round(6*p*this.intensity);i++)this.spawn(x+rnd(-9,9)*p,y+rnd(-9,9)*p,{vx:rnd(-35,35),vy:rnd(-45,45),size:rnd(8,24)*(p>1?1.4:1),life:rnd(.2,.7)*p,gravity:0,star:p>1&&Math.random()<.5})}
+  charge(x,y,p=1){for(let i=0;i<Math.round(8*p*this.intensity);i++){const a=rnd(0,Math.PI*2),r=rnd(30,95)*(p>1?1.5:1);this.spawn(x+Math.cos(a)*r,y+Math.sin(a)*r,{vx:-Math.cos(a)*r*1.6,vy:-Math.sin(a)*r*1.6,size:rnd(12,29),life:rnd(.25,.7),gravity:0,color:0x72caff})}}
+  burst(x,y,p=1){for(let i=0;i<Math.round(135*(p>1?1.8:1)*this.intensity);i++){const a=rnd(0,Math.PI*2),v=rnd(80,600)*(p>1?1.5:1);this.spawn(x,y,{vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:rnd(.65,1.65),size:rnd(10,44),gravity:25,star:i%(p>1?2:3)===0})}
+    if(p>1){this.ring(x,y,1,.45);for(let k=0;k<8;k++){const a=k*Math.PI/4;this.shard(x,y,Math.cos(a)*950,Math.sin(a)*950)}}}
   // Heavy snowfall from the top edge, slanted by wind; fill=true seeds the whole screen so it doesn't start empty
-  storm(fill=false){const n=Math.round((fill?160:34)*this.intensity),wind=rnd(60,140);for(let i=0;i<n;i++){const near=Math.random(),sz=8+near*40,speed=180+near*320,y0=fill?rnd(0,innerHeight):innerHeight+rnd(10,60);this.spawn(rnd(-innerWidth*.15,innerWidth),y0,{vx:wind*(.6+near)+rnd(-30,30),vy:-speed,life:(y0+40)/speed+rnd(0,.3),size:sz,gravity:-30,star:near>.55&&Math.random()<.5,opacity:.5+near*.45})}}
+  storm(fill=false,p=1){const n=Math.round((fill?160:34)*(p>1?1.7:1)*this.intensity),wind=rnd(60,140);for(let i=0;i<n;i++){const near=Math.random(),sz=8+near*40,speed=180+near*320,y0=fill?rnd(0,innerHeight):innerHeight+rnd(10,60);this.spawn(rnd(-innerWidth*.15,innerWidth),y0,{vx:wind*(.6+near)+rnd(-30,30),vy:-speed,life:(y0+40)/speed+rnd(0,.3),size:sz,gravity:-30,star:near>.55&&Math.random()<(p>1?.8:.5),opacity:.5+near*.45})}}
   // Solid ice spires that burst out of the ground (bottom edge) up to the hand, hold, then shatter into frost
-  pillar(x,y){
+  pillar(x,y,p=1){
     const top=Math.max(y,innerHeight*.25),g=new THREE.Group(),shards=[];g.position.set(x,0,0);
     const add=(h,r,dx,tilt,delay)=>{
       const geo=new THREE.ConeGeometry(r,h,6,1);geo.translate(0,h/2,0);
       const mat=this.iceMat.clone(),edge=new THREE.LineSegments(new THREE.EdgesGeometry(geo),this.edgeMat.clone());
       const m=new THREE.Mesh(geo,mat);m.add(edge);m.position.x=dx;m.rotation.set(rnd(-.25,.25),rnd(0,Math.PI),tilt);m.scale.y=.001;g.add(m);shards.push({m,delay});
     };
-    const w=Math.min(Math.max(top*.11,38),80);
+    const w=Math.min(Math.max(top*.11,38),80)*(p>1?1.35:1);
     add(top,w,0,rnd(-.04,.04),0);
-    for(let k=0;k<5;k++){const side=k%2?1:-1,f=rnd(.3,.7);add(top*f,w*rnd(.45,.7),side*rnd(w*.5,w*1.4),-side*rnd(.15,.5),.06+k*.04)}
+    for(let k=0;k<(p>1?9:5);k++){const side=k%2?1:-1,f=rnd(.3,.75);add(top*f,w*rnd(.45,.7),side*rnd(w*.5,w*(p>1?2:1.4)),-side*rnd(.15,.55),.06+k*.035)}
     this.scene.add(g);this.spires.push({g,shards,top,x,age:0,hold:2.6});
     for(let k=0;k<Math.round(30*this.intensity);k++)this.spawn(x+rnd(-w*1.8,w*1.8),rnd(0,20),{vx:rnd(-260,260),vy:rnd(40,260),life:rnd(.4,.9),size:rnd(10,26),gravity:-420,color:0xd8f8ff});
   }
@@ -56,8 +59,8 @@ export class MagicEffects{
   animate(life,step,end){this.anims.push({age:0,life,step,end})}
   disposeObj(o){this.scene.remove(o);o.traverse(c=>{c.geometry?.dispose();c.material?.dispose()})}
   // Rotating six-armed snowflake sigil that unfolds at (x,y), then dissolves into crystals
-  sigil(x,y){
-    const R=Math.min(innerWidth,innerHeight)*.38,segs=[];const seg=(a,b)=>segs.push([a,b]),P=(r,a)=>new THREE.Vector2(Math.cos(a)*r,Math.sin(a)*r);
+  sigil(x,y,p=1){
+    const R=Math.min(innerWidth,innerHeight)*.38*(p>1?1.3:1),segs=[];const seg=(a,b)=>segs.push([a,b]),P=(r,a)=>new THREE.Vector2(Math.cos(a)*r,Math.sin(a)*r);
     for(let k=0;k<6;k++){const a=k*Math.PI/3;seg(P(R*.16,a),P(R,a));for(const f of [.36,.58,.8]){const b=P(R*f,a),len=R*(1.05-f)*.6;seg(b,b.clone().add(P(len,a+.6)));seg(b,b.clone().add(P(len,a-.6)))}seg(P(R*.5,a),P(R*.5,a+Math.PI/3));seg(P(R*.16,a),P(R*.16,a+Math.PI/3))}
     for(let ring of [1.08,1.16])for(let k=0;k<72;k++)seg(P(R*ring,k*Math.PI/36),P(R*ring,(k+1)*Math.PI/36));
     for(let k=0;k<12;k++){const a=k*Math.PI/6+Math.PI/12;seg(P(R*1.08,a),P(R*1.16,a))} // rune ticks between the two outer rings
@@ -68,21 +71,23 @@ export class MagicEffects{
     const halo=new THREE.Sprite(new THREE.SpriteMaterial({map:this.dot,color:0x7fd8ff,transparent:true,opacity:.5,blending:THREE.AdditiveBlending,depthWrite:false}));halo.scale.set(R*2.6,R*2.6,1);
     g.add(halo,glow,core);g.position.set(x,y,1);this.scene.add(g);
     this.animate(2.3,t=>{const grow=1-(1-Math.min(t/.28,1))**3,fade=t<.78?1:1-(t-.78)/.22;g.scale.setScalar(grow);glow.rotation.z=core.rotation.z=t*1.8;glow.material.opacity=.35*fade*(.8+.2*Math.sin(t*40));core.material.opacity=fade;halo.material.opacity=.5*fade;for(let k=0;k<2;k++){const a=rnd(0,Math.PI*2),r=R*grow*rnd(.2,1.16);this.spawn(x+Math.cos(a)*r,y+Math.sin(a)*r,{vx:0,vy:rnd(-10,10),size:rnd(12,28),life:rnd(.3,.7),gravity:0,star:true})}},
-      ()=>{this.disposeObj(g);for(let k=0;k<Math.round(110*this.intensity);k++){const a=rnd(0,Math.PI*2),v=rnd(60,320);this.spawn(x+Math.cos(a)*R*.7,y+Math.sin(a)*R*.7,{vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:rnd(.5,1.2),size:rnd(12,32),gravity:20,star:k%2===0})}});
+      ()=>{this.disposeObj(g);for(let k=0;k<Math.round(110*this.intensity);k++){const a=rnd(0,Math.PI*2),v=rnd(60,320);this.spawn(x+Math.cos(a)*R*.7,y+Math.sin(a)*R*.7,{vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:rnd(.5,1.2),size:rnd(12,32),gravity:20,star:k%2===0})}
+        if(p>1){this.ring(x,y,1,.7);for(let k=0;k<6;k++){const a=k*Math.PI/3+Math.PI/6;this.shard(x,y,Math.cos(a)*1000,Math.sin(a)*1000,2)}}});
   }
   // Ice shard projectile flying with velocity (vx,vy) px/s, leaving a frost trail
-  shard(x,y,vx,vy){
-    const geo=new THREE.ConeGeometry(11,80,6);geo.rotateZ(-Math.PI/2); // tip points along +x
+  shard(x,y,vx,vy,p=1){
+    const geo=new THREE.ConeGeometry(11*(p>1?1.5:1),80*(p>1?1.5:1),6);geo.rotateZ(-Math.PI/2); // tip points along +x
     const m=new THREE.Mesh(geo,this.iceMat.clone());m.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo),this.edgeMat.clone()));m.position.set(x,y,2);m.rotation.z=Math.atan2(vy,vx);this.scene.add(m);
-    const hit=()=>{for(let k=0;k<Math.round(35*this.intensity);k++){const a=rnd(0,Math.PI*2),v=rnd(60,300);this.spawn(m.position.x,m.position.y,{vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:rnd(.4,.9),size:rnd(10,26),gravity:30,star:k%3===0})}this.disposeObj(m)};
+    const hit=()=>{for(let k=0;k<Math.round(35*(p>1?2.5:1)*this.intensity);k++){const a=rnd(0,Math.PI*2),v=rnd(60,300);this.spawn(m.position.x,m.position.y,{vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:rnd(.4,.9),size:rnd(10,26),gravity:30,star:k%3===0})}this.disposeObj(m)};
     const a={age:0,life:1.4,step:(t,dt)=>{m.position.x+=vx*dt;m.position.y+=vy*dt;m.rotation.x+=dt*9;for(let k=0;k<3;k++)this.spawn(m.position.x-vx*.03+rnd(-6,6),m.position.y-vy*.03+rnd(-6,6),{vx:rnd(-30,30),vy:rnd(-30,30),size:rnd(8,20),life:rnd(.2,.5),gravity:0});const p=m.position;if(p.x<-40||p.x>innerWidth+40||p.y<-40||p.y>innerHeight+40)a.age=a.life},end:hit};
     this.anims.push(a);
   }
   // Expanding shockwave ring of ice
-  ring(x,y){
+  ring(x,y,p=1,scale=1){
+    if(p>1&&scale===1)this.animate(.18,()=>{},()=>this.ring(x,y,1,.75)); // upgraded: a second, trailing ring
     const mat=new THREE.MeshBasicMaterial({color:0xaeeeff,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}),m=new THREE.Mesh(new THREE.RingGeometry(0,1,96),mat);m.position.set(x,y,3);this.scene.add(m);
-    const maxR=Math.hypot(innerWidth,innerHeight)*.55;let lastR=0;
-    this.animate(.8,t=>{const r=Math.max(12,maxR*(1-(1-t)**2.4));m.geometry.dispose();m.geometry=new THREE.RingGeometry(r-10*(1-t)-2,r,96);mat.opacity=1-t;if(r-lastR>14){const n=Math.round(14*this.intensity);for(let k=0;k<n;k++){const a=rnd(0,Math.PI*2);this.spawn(x+Math.cos(a)*r,y+Math.sin(a)*r,{vx:Math.cos(a)*60,vy:Math.sin(a)*60,size:rnd(10,26),life:rnd(.3,.7),gravity:0,star:Math.random()<.4})}lastR=r}},()=>this.disposeObj(m));
+    const maxR=Math.hypot(innerWidth,innerHeight)*.55*scale*(p>1?1.25:1),band=p>1?22:10;let lastR=0;
+    this.animate(.8,t=>{const r=Math.max(12,maxR*(1-(1-t)**2.4));m.geometry.dispose();m.geometry=new THREE.RingGeometry(Math.max(0,r-band*(1-t)-2),r,96);mat.opacity=1-t;if(r-lastR>14){const n=Math.round(14*this.intensity);for(let k=0;k<n;k++){const a=rnd(0,Math.PI*2);this.spawn(x+Math.cos(a)*r,y+Math.sin(a)*r,{vx:Math.cos(a)*60,vy:Math.sin(a)*60,size:rnd(10,26),life:rnd(.3,.7),gravity:0,star:Math.random()<.4})}lastR=r}},()=>this.disposeObj(m));
   }
   // Frost creeping in from the screen edges; setFrost(0..1) fades it in/out
   setFrost(v){this.frost.style.opacity=String(v)}
