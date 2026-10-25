@@ -59,21 +59,22 @@ function renderHands(result,now){
     st.armorToggled=kind==='peace'&&prev?.armorToggled;
     if(kind==='peace'&&!st.armorToggled&&held>hold(800))st.armorToggled=fx.isArmored(id)?cast(now,'❄ GLOVE OFF ❄',()=>fx.armorOff(id)):cast(now,'❄ FROST GLOVE ❄',()=>fx.armorOn(id));
     if(fx.isArmored(id))fx.armorTrack(id,l.map(point));
-    st.hist=[...(prev?.hist??[]).filter(p=>now-p.t<450),{t:now,y:center.y}];
+    st.hist=[...(prev?.hist??[]).filter(p=>now-p.t<650),{t:now,y:center.y}];
     hands.push({center,kind,held,hist:st.hist});handStates.set(id,st);
   }
   for(const [id,s] of handStates)if(!seen.has(id)&&now-s.lastSeen>500)handStates.delete(id);
   const P2=[...handStates.keys()].some(id=>fx.isArmored(id))?2:1; // two-hand spells upgrade if either hand wears the glove
   const two=hands.length===2,both=k=>two&&hands.every(h=>h.kind===k);
-  // Blizzard: both hands open and well apart for a moment; keeps snowing while held
+  // Ice spires (checked before the blizzard so a lift wins): both non-fist hands rose within 650ms,
+  // the higher one by >15% of the screen and the other by >8%. Three's y axis points up.
+  const rises=two?hands.map(h=>h.center.y-Math.min(...h.hist.map(p=>p.y))):[0,0],lifting=Math.max(...rises)>innerHeight*.06;
+  if(two&&hands.every(h=>h.kind!=='fist')&&now-pillarAt>hold(1500)&&Math.max(...rises)>innerHeight*move(.15)&&Math.min(...rises)>innerHeight*move(.08)
+    &&cast(now,N(P2,'ICE PILLARS'),()=>hands.forEach(h=>fx.pillar(h.center.x,h.center.y,P2))))pillarAt=now;
+  // Blizzard: both hands open and well apart for a moment; keeps snowing while held.
+  // It pauses while the hands are lifting (that's the ice-spire gesture) and right after spires.
   if(both('open')){
     const d=distance(hands[0].center,hands[1].center);
-    if(d>innerWidth*Math.min(move(.35),.8)&&hands.every(h=>h.held>hold(300))&&now-stormAt>110){fx.storm(now-stormAt>600,P2);if(now-stormAt>1500)notice(N(P2,'BLIZZARD'));stormAt=now}
-  }
-  // Ice spires: both open hands rose a lot within 450ms, by similar amounts (a deliberate lift, not drift). Three's y axis points up.
-  if(both('open')&&now-pillarAt>hold(1500)){
-    const rises=hands.map(h=>h.center.y-Math.min(...h.hist.map(p=>p.y))),need=innerHeight*move(.18);
-    if(rises.every(r=>r>need)&&Math.max(...rises)<Math.min(...rises)*2&&cast(now,N(P2,'ICE PILLARS'),()=>hands.forEach(h=>fx.pillar(h.center.x,h.center.y,P2))))pillarAt=now;
+    if(d>innerWidth*Math.min(move(.35),.8)&&hands.every(h=>h.held>hold(500))&&!lifting&&now-pillarAt>1200&&now-stormAt>110){fx.storm(now-stormAt>600,P2);if(now-stormAt>1500)notice(N(P2,'BLIZZARD'));stormAt=now}
   }
   // Clap: hands that were far apart closed in fast. When they touch, the tracker often merges them
   // into one hand, so a pair that was approaching and then vanished within 200ms also counts.
